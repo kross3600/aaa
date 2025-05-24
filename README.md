@@ -1,63 +1,63 @@
+-- >> Código complementar: Linha de rebote (tabela) << --
+
 local RunService = game:GetService("RunService")
 
--- Caminhos iguais ao seu script original
-local guides = workspace.Tables.Table1.Guides
+local guides = workspace:WaitForChild("Tables"):WaitForChild("Table1"):WaitForChild("Guides")
 local hitTrajectory = guides:WaitForChild("HitTrajectory")
 
 local maxDistance = 100
-local lineParts = {}
+local reflectionParts = {}
 
--- Cria uma linha visual entre dois pontos
-local function drawLine(from, to)
+local function drawLine(startPos, endPos)
 	local part = Instance.new("Part")
 	part.Anchored = true
 	part.CanCollide = false
-	part.Size = Vector3.new(0.1, 0.1, (from - to).Magnitude)
-	part.CFrame = CFrame.new((from + to) / 2, to)
-	part.BrickColor = BrickColor.new("Bright red")
 	part.Material = Enum.Material.Neon
-	part.Transparency = 0.3
-	part.Name = "TrajectoryLine"
+	part.BrickColor = BrickColor.new("Bright red")
+	part.Transparency = 0.25
+	part.Size = Vector3.new(0.1, 0.1, (startPos - endPos).Magnitude)
+	part.CFrame = CFrame.new((startPos + endPos)/2, endPos)
 	part.Parent = workspace
-	table.insert(lineParts, part)
+	table.insert(reflectionParts, part)
 end
 
--- Remove linhas antigas
 local function clearLines()
-	for _, p in pairs(lineParts) do
-		if p and p.Parent then
-			p:Destroy()
+	for _, part in pairs(reflectionParts) do
+		if part and part.Parent then
+			part:Destroy()
 		end
 	end
-	lineParts = {}
+	table.clear(reflectionParts)
 end
 
--- Desenha a linha de trajetória com 1 rebote
-local function updateTrajectory()
+local function updateReflection()
 	clearLines()
 
-	-- Só desenha se estiver ativo no seu sistema
-	if hitTrajectory.Transparency == 1 then return end
+	if hitTrajectory.Transparency >= 1 then return end
 
 	local origin = hitTrajectory.Position
 	local direction = hitTrajectory.CFrame.LookVector
 
+	-- Primeiro raio
 	local result1 = workspace:Raycast(origin, direction * maxDistance)
 	if result1 then
 		drawLine(origin, result1.Position)
 
-		local incoming = direction
+		-- Reflexão
 		local normal = result1.Normal
-		local reflected = incoming - 2 * incoming:Dot(normal) * normal
-		local bounceStart = result1.Position + normal * 0.1
+		local reflected = direction - 2 * direction:Dot(normal) * normal
+		local bounceOrigin = result1.Position + normal * 0.05
 
-		local result2 = workspace:Raycast(bounceStart, reflected * maxDistance)
+		-- Segundo raio
+		local result2 = workspace:Raycast(bounceOrigin, reflected * maxDistance)
 		if result2 then
-			drawLine(bounceStart, result2.Position)
+			drawLine(bounceOrigin, result2.Position)
 		else
-			drawLine(bounceStart, bounceStart + reflected * 10)
+			drawLine(bounceOrigin, bounceOrigin + reflected * 10)
 		end
 	else
 		drawLine(origin, origin + direction * maxDistance)
 	end
 end
+
+RunService.RenderStepped:Connect(updateReflection)
