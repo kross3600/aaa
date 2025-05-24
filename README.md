@@ -1,70 +1,72 @@
-loadstring(game:HttpGet('https://raw.githubusercontent.com/kross3600/aaa/refs/heads/main/README.md'))()
-
--- Script complementar: Previsão de rebote (tabela) sem modificar o script original
-
 local RunService = game:GetService("RunService")
 
-local guides = workspace:WaitForChild("Tables"):WaitForChild("Table1"):WaitForChild("Guides")
+local workspaceTables = workspace:WaitForChild("Tables")
+local table1 = workspaceTables:WaitForChild("Table1")
+local guides = table1:WaitForChild("Guides")
 local hitTrajectory = guides:WaitForChild("HitTrajectory")
+local collisionParts = table1:WaitForChild("Collision")
 
-local collisionParts = workspace.Tables.Table1:WaitForChild("Collision")
-
-local maxDistance = 100
+local maxDistance = 50
 local lineParts = {}
 
-local raycastParams = RaycastParams.new()
-raycastParams.FilterDescendantsInstances = {collisionParts}
-raycastParams.FilterType = Enum.RaycastFilterType.Whitelist
-raycastParams.IgnoreWater = true
+local function clearLines()
+	for _, part in ipairs(lineParts) do
+		if part and part.Parent then
+			part:Destroy()
+		end
+	end
+	table.clear(lineParts)
+end
 
-local function drawLine(from, to)
+local function drawLine(from, to, color)
 	local part = Instance.new("Part")
 	part.Anchored = true
 	part.CanCollide = false
-	part.Size = Vector3.new(0.1, 0.1, (from - to).Magnitude)
-	part.CFrame = CFrame.new((from + to)/2, to)
+	part.Size = Vector3.new(0.1, 0.1, (to - from).Magnitude)
+	part.CFrame = CFrame.new((from + to) / 2, to)
 	part.Material = Enum.Material.Neon
-	part.BrickColor = BrickColor.new("Bright red")
+	part.BrickColor = color or BrickColor.new("Bright red")
 	part.Transparency = 0.3
 	part.Name = "TrajectoryLine"
 	part.Parent = workspace
 	table.insert(lineParts, part)
 end
 
-local function clearLines()
-	for _, p in pairs(lineParts) do
-		if p and p.Parent then
-			p:Destroy()
-		end
-	end
-	table.clear(lineParts)
+local function calculateReflection(direction, normal)
+	return direction - 2 * direction:Dot(normal) * normal
 end
 
 local function updateTrajectory()
 	clearLines()
-
 	if hitTrajectory.Transparency >= 1 then return end
-
+	
 	local origin = hitTrajectory.Position
-	local direction = hitTrajectory.CFrame.LookVector
+	local direction = hitTrajectory.CFrame.LookVector.Unit * maxDistance
 
-	local result1 = workspace:Raycast(origin, direction * maxDistance, raycastParams)
+	-- Primeiro raio
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterDescendantsInstances = {collisionParts}
+	raycastParams.FilterType = Enum.RaycastFilterType.Whitelist
+	raycastParams.IgnoreWater = true
+
+	local result1 = workspace:Raycast(origin, direction, raycastParams)
 	if result1 then
-		drawLine(origin, result1.Position)
+		drawLine(origin, result1.Position, BrickColor.new("Bright red"))
 
 		local normal = result1.Normal
-		local reflected = direction - 2 * direction:Dot(normal) * normal
-		local bounceOrigin = result1.Position + normal * 0.05
+		local reflectedDir = calculateReflection(direction.Unit, normal)
 
-		local result2 = workspace:Raycast(bounceOrigin, reflected * maxDistance, raycastParams)
+		-- Segundo raio (rebote)
+		local bounceOrigin = result1.Position + normal * 0.1
+		local result2 = workspace:Raycast(bounceOrigin, reflectedDir * maxDistance, raycastParams)
+
 		if result2 then
-			drawLine(bounceOrigin, result2.Position)
+			drawLine(bounceOrigin, result2.Position, BrickColor.new("Bright yellow"))
 		else
-			drawLine(bounceOrigin, bounceOrigin + reflected * 10)
+			drawLine(bounceOrigin, bounceOrigin + reflectedDir * 10, BrickColor.new("Bright yellow"))
 		end
 	else
-		drawLine(origin, origin + direction * 10)
+		-- Caso não bata em nada, só desenha a linha simples
+		drawLine(origin, origin + direction, BrickColor.new("Bright red"))
 	end
 end
-
-RunService.RenderStepped:Connect(updateTrajectory)
