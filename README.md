@@ -66,5 +66,3 @@ local function updateTrajectory()
 		drawLine(origin, origin + direction * maxDistance)
 	end
 end
-
-RunService.RenderStepped:Connect(updateTrajectory)
